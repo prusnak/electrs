@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use electrs_rocksdb as rocksdb;
+use rocksdb;
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -233,6 +233,7 @@ impl DBStore {
         opts.set_prefix_same_as_start(true); // requires .set_prefix_extractor() above.
         self.db
             .iterator_cf_opt(cf, opts, mode)
+            .map(Result::unwrap)
             .map(|(key, _value)| key) // values are empty in prefix-scanned CFs
     }
 
@@ -241,6 +242,7 @@ impl DBStore {
         opts.fill_cache(false);
         self.db
             .iterator_cf_opt(self.headers_cf(), opts, rocksdb::IteratorMode::Start)
+            .map(Result::unwrap)
             .map(|(key, _)| key)
             .filter(|key| &key[..] != TIP_KEY) // headers' rows are longer than TIP_KEY
             .collect()
@@ -296,7 +298,7 @@ impl DBStore {
             for property in &["rocksdb.dbstats"] {
                 let stats = self
                     .db
-                    .property_value(property)
+                    .property_value(*property)
                     .expect("failed to get property")
                     .expect("missing property");
                 trace!("{}: {}", property, stats);
@@ -312,7 +314,7 @@ impl DBStore {
             DB_PROPERIES.iter().filter_map(move |property_name| {
                 let value = self
                     .db
-                    .property_int_value_cf(cf, property_name)
+                    .property_int_value_cf(cf, *property_name)
                     .expect("failed to get property");
                 Some((*cf_name, *property_name, value?))
             })
